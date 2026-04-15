@@ -7,7 +7,7 @@ const path      = require('path');
 const BASE_URL    = process.env.STAFF_SITE_URL || 'https://staff.port.ac.uk';
 const USERNAME    = process.env.STAFF_USERNAME;
 const PASSWORD    = process.env.STAFF_PASSWORD;
-const OUTPUT_FILE = path.join(__dirname, '..', 'public', 'search-index.json');
+const OUTPUT_FILE = path.join(__dirname, '..', 'docs', 'search-index.json');
 const MAX_PAGES   = 2000;   // safety limit — increase if needed
 const DELAY_MS    = 500;    // polite delay between page visits
 

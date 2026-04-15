@@ -48,7 +48,7 @@ jobs:
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/search-index.json
+          git add docs/search-index.json
           # Only commit if the file actually changed
           git diff --staged --quiet || git commit -m \
             'chore: update search index [$(date -u +%Y-%m-%dT%H:%M:%SZ)]'
