@@ -67,22 +67,50 @@ async function login(page) {
 }
 
 // ── Page Content Extraction ────────────────────────────────
-// Extracts title and body text from a loaded page.
+// Extracts title, headings, body text and link text from a page.
+// Stores them as separate fields so Fuse.js can weight them independently.
 function extractContent(html, url) {
   const $ = cheerio.load(html);
 
-  // Remove navigation, header, footer — keep main content only
-  $('nav, header, footer, script, style, [role=navigation]').remove();
+  // Remove everything that isn't content
+  $('nav, header, footer, script, style, noscript, iframe,
+     [role=navigation], [role=banner], [role=contentinfo]').remove();
 
-  const title = $('h1').first().text().trim()
-    || $('title').text().trim()
+  // ── Title ──────────────────────────────────────────────────
+  // Use the <title> tag first — it's the most reliable unique identifier.
+  // Strip the site name suffix (e.g. ' | University of Portsmouth') if present.
+  const rawTitle = $('title').text().trim();
+  const title = rawTitle.split('|')[0].trim()
+    || $('h1').first().text().trim()
     || url;
 
-  // Prefer a main content area — update selector to match T4 layout
-  const bodyEl = $('main, [id*=content], body').first();
-  const body = bodyEl.text().replace(/\s+/g, ' ').trim().slice(0, 2000);
+  // ── Headings ───────────────────────────────────────────────
+  // Collect all h1–h5 text into a single string for boosted matching.
+  const headings = $('h1, h2, h3, h4, h5')
+    .map((_, el) => $(el).text().trim())
+    .get()
+    .filter(Boolean)
+    .join(' ');
 
-  return { title, body };
+  // ── Body text ──────────────────────────────────────────────
+  // Extract text from paragraphs, list items, table cells, and divs.
+  // This avoids pulling in raw HTML tags.
+  const bodyParts = [];
+  $('p, li, td, th, dt, dd').each((_, el) => {
+    const text = $(el).text().replace(/\s+/g, ' ').trim();
+    if (text.length > 20) bodyParts.push(text); // skip very short fragments
+  });
+  const body = bodyParts.join(' ');
+
+  // ── Link text ──────────────────────────────────────────────
+  // Link text often contains important keywords not in body paragraphs.
+  const links = $('a')
+    .map((_, el) => $(el).text().trim())
+    .get()
+    .filter(t => t.length > 3) // skip single-word nav links
+    .join(' ');
+
+  return { title, headings, body, links };
 }
 
 // ── Link Discovery ─────────────────────────────────────────
@@ -140,7 +168,7 @@ async function crawl() {
       const { title, body } = extractContent(html, url);
 
       if (title && body) {
-        index.push({ url, title, body });
+        index.push({ url, title, headings, body, links });
       }
 
       const links = discoverLinks(html, url);
