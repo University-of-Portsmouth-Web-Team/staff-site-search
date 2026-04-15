@@ -20,14 +20,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
-          cache-dependency-path: crawler/package-lock.json
 
       # Step 3: Install crawler dependencies
       - name: Install dependencies
         working-directory: ./crawler
-        run: npm ci
+        run: npm install
 
       # Step 4: Install Chromium for Puppeteer
       - name: Install Puppeteer browser
