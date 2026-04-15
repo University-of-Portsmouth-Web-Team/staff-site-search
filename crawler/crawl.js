@@ -63,7 +63,7 @@ async function login(page) {
   if (!finalUrl.startsWith(BASE_URL)) {
     throw new Error(`Login failed. Still on SSO after redirect attempt. URL: ${finalUrl}`);
   }
-  console.log('Login successful. Current URL:', currentUrl);
+  console.log('Login successful. Current URL:', finalUrl);
 }
 
 // ── Page Content Extraction ────────────────────────────────
