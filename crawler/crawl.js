@@ -26,10 +26,10 @@ async function login(page) {
 
   await page.goto(loginUrl, { waitUntil: 'networkidle2', timeout: 30000 });
 
-  // The form is injected into #theNidpContent via AJAX after page load.
-  // Wait for the username field to appear inside that container.
+  // The form loads into #namepassword via AJAX after page load.
+  // Wait for the username field to confirm the form is ready.
   console.log('Waiting for credential form to load...');
-  await page.waitForSelector('#theNidpContent input[name="Ecom_User_ID"]',
+  await page.waitForSelector('#namepassword input[name="Ecom_User_ID"]',
     { timeout: 15000 }
   );
 
@@ -37,15 +37,14 @@ async function login(page) {
   await page.type('input[name="Ecom_User_ID"]', USERNAME);
   await page.type('input[name="Ecom_Password"]', PASSWORD);
 
-  // Find the submit button — NAM forms use either input[type=submit] or button[type=submit]
-  const submitSelector = await page.$('input[type="submit"]')
-    ? 'input[type="submit"]'
-    : 'button[type="submit"]';
+  // The sign-in button is a <span> with id loginButton2, not an input or button element.
+  // Wait for it to be present before clicking.
+  await page.waitForSelector('#loginButton2', { timeout: 10000 });
 
-  // Submit the form and wait for redirect back to staff.port.ac.uk
+  // Click the span and wait for redirect back to staff.port.ac.uk
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-    page.click(submitSelector),
+    page.click('#loginButton2'),
   ]);
 
   // Confirm we landed on the staff site, not back on SSO
