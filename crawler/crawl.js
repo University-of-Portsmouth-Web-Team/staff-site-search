@@ -73,8 +73,7 @@ function extractContent(html, url) {
   const $ = cheerio.load(html);
 
   // Remove everything that isn't content
-  $('nav, header, footer, script, style, noscript, iframe,
-     [role=navigation], [role=banner], [role=contentinfo]').remove();
+  $('nav, header, footer, script, style, noscript, iframe, [role=navigation], [role=banner], [role=contentinfo]').remove();
 
   // ── Title ──────────────────────────────────────────────────
   // Use the <title> tag first — it's the most reliable unique identifier.
