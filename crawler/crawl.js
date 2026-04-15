@@ -133,7 +133,7 @@ function discoverLinks(html, currentUrl) {
 // ── Main Crawl ─────────────────────────────────────────────
 async function crawl() {
   const browser = await puppeteer.launch({
-    headless: 'new',
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'] // required in GitHub Actions
   });
   const page = await browser.newPage();
@@ -164,14 +164,14 @@ async function crawl() {
       await new Promise(r => setTimeout(r, DELAY_MS));
 
       const html = await page.content();
-      const { title, headings, body, links } = extractContent(html, url);
+      const { title, headings, body, links: linkText } = extractContent(html, url);
 
       if (title && body) {
-        index.push({ url, title, headings, body, links });
+        index.push({ url, title, headings, body, links: linkText });
       }
 
-      const links = discoverLinks(html, url);
-      for (const link of links) {
+      const discovered = discoverLinks(html, url);
+      for (const link of discovered) {
         if (!visited.has(link)) queue.push(link);
       }
     } catch (err) {
