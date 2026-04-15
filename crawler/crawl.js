@@ -41,16 +41,27 @@ async function login(page) {
   // Wait for it to be present before clicking.
   await page.waitForSelector('#loginButton2', { timeout: 10000 });
 
-  // Click the span and wait for redirect back to staff.port.ac.uk
+  // Click the span and wait for navigation (may go to staff site or SSO portal)
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
     page.click('#loginButton2'),
   ]);
 
-  // Confirm we landed on the staff site, not back on SSO
-  const currentUrl = page.url();
-  if (!currentUrl.startsWith(BASE_URL)) {
-    throw new Error(`Login may have failed. Expected ${BASE_URL}, got: ${currentUrl}`);
+  // NetIQ sometimes redirects to /nidp/portal instead of the target URL.
+  // If that happens, navigate directly to the staff site — the session cookie
+  // is already set so it will pass through SSO without prompting again.
+  const postLoginUrl = page.url();
+  console.log('Post-login URL:', postLoginUrl);
+
+  if (!postLoginUrl.startsWith(BASE_URL)) {
+    console.log('Redirected to SSO portal — navigating directly to staff site...');
+    await page.goto(BASE_URL, { waitUntil: 'networkidle2', timeout: 30000 });
+  }
+
+  // Final check — if we're still on SSO, credentials are wrong or login failed
+  const finalUrl = page.url();
+  if (!finalUrl.startsWith(BASE_URL)) {
+    throw new Error(`Login failed. Still on SSO after redirect attempt. URL: ${finalUrl}`);
   }
   console.log('Login successful. Current URL:', currentUrl);
 }
