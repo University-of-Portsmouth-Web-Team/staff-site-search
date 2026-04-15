@@ -1,1 +1,56 @@
+name: Crawl and Rebuild Search Index
 
+on:
+  schedule:
+    # Runs every Sunday at 02:00 UTC
+    # Cron format: minute hour day-of-month month day-of-week
+    - cron: '0 2 * * 0'
+  workflow_dispatch:   # Allows manual trigger from the GitHub Actions UI
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Step 2: Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: crawler/package-lock.json
+
+      # Step 3: Install crawler dependencies
+      - name: Install dependencies
+        working-directory: ./crawler
+        run: npm ci
+
+      # Step 4: Install Chromium for Puppeteer
+      - name: Install Puppeteer browser
+        working-directory: ./crawler
+        run: npx puppeteer browsers install chrome
+
+      # Step 5: Run the crawler
+      # Secrets are passed as environment variables — never hardcoded
+      - name: Run crawler
+        working-directory: ./crawler
+        env:
+          STAFF_SITE_URL: ${{ secrets.STAFF_SITE_URL }}
+          STAFF_USERNAME: ${{ secrets.STAFF_USERNAME }}
+          STAFF_PASSWORD: ${{ secrets.STAFF_PASSWORD }}
+        run: node crawl.js
+
+      # Step 6: Commit the updated index back to the repo
+      - name: Commit updated index
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/search-index.json
+          # Only commit if the file actually changed
+          git diff --staged --quiet || git commit -m \
+            'chore: update search index [$(date -u +%Y-%m-%dT%H:%M:%SZ)]'
+          git push
