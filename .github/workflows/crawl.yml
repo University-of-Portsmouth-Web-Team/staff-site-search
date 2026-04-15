@@ -21,7 +21,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          # cache: 'npm' intentionally omitted — requires a lockfile at repo root.
+          # npm install in the next step handles dependency resolution directly.
 
       # Step 3: Install crawler dependencies
       - name: Install dependencies
