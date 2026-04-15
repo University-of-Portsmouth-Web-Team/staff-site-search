@@ -37,10 +37,15 @@ async function login(page) {
   await page.type('input[name="Ecom_User_ID"]', USERNAME);
   await page.type('input[name="Ecom_Password"]', PASSWORD);
 
+  // Find the submit button — NAM forms use either input[type=submit] or button[type=submit]
+  const submitSelector = await page.$('input[type="submit"]')
+    ? 'input[type="submit"]'
+    : 'button[type="submit"]';
+
   // Submit the form and wait for redirect back to staff.port.ac.uk
   await Promise.all([
     page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
-    page.click('input[type="submit"]'),
+    page.click(submitSelector),
   ]);
 
   // Confirm we landed on the staff site, not back on SSO
