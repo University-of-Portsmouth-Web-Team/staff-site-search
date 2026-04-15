@@ -164,7 +164,7 @@ async function crawl() {
       await new Promise(r => setTimeout(r, DELAY_MS));
 
       const html = await page.content();
-      const { title, body } = extractContent(html, url);
+      const { title, headings, body, links } = extractContent(html, url);
 
       if (title && body) {
         index.push({ url, title, headings, body, links });
