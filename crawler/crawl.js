@@ -109,7 +109,19 @@ function extractContent(html, url) {
     .filter(t => t.length > 3) // skip single-word nav links
     .join(' ');
 
-  return { title, headings, body, links };
+  // ── Last Modified Date ─────────────────────────────────────
+  // Many pages embed a structured HTML comment in the form:
+  //   <!-- Page last modified date: YYYY-MM-DD -->
+  // Parse it out so audit tools can surface stale content.
+  let lastModified = null;
+  const lastModifiedMatch = html.match(
+    /<!--\s*Page last modified date[:\s]+([^-\s][^-]*?)[\s-]*-->/i
+  );
+  if (lastModifiedMatch) {
+    lastModified = lastModifiedMatch[1].trim();
+  }
+
+  return { title, headings, body, links, lastModified };
 }
 
 // ── Link Discovery ─────────────────────────────────────────
@@ -164,10 +176,10 @@ async function crawl() {
       await new Promise(r => setTimeout(r, DELAY_MS));
 
       const html = await page.content();
-      const { title, headings, body, links: linkText } = extractContent(html, url);
+      const { title, headings, body, links: linkText, lastModified } = extractContent(html, url);
 
       if (title && body) {
-        index.push({ url, title, headings, body, links: linkText });
+        index.push({ url, title, headings, body, links: linkText, lastModified });
       }
 
       const discovered = discoverLinks(html, url);
