@@ -67,8 +67,9 @@ async function login(page) {
 }
 
 // ── Page Content Extraction ────────────────────────────────
-// Extracts title, headings, body text and link text from a page.
-// Stores them as separate fields so Fuse.js can weight them independently.
+// Extracts title, headings, body text, link text, and last-modified metadata
+// from a page. Stores them as separate fields so Fuse.js can weight them
+// independently. lastModified and lastModifiedBy are parsed from HTML comments.
 function extractContent(html, url) {
   const $ = cheerio.load(html);
 
@@ -110,18 +111,34 @@ function extractContent(html, url) {
     .join(' ');
 
   // ── Last Modified Date ─────────────────────────────────────
-  // Many pages embed a structured HTML comment in the form:
-  //   <!-- Page last modified date: YYYY-MM-DD -->
-  // Parse it out so audit tools can surface stale content.
-  let lastModified = null;
-  const lastModifiedMatch = html.match(
-    /<!--\s*Page last modified date[:\s]+([^-\s][^-]*?)[\s-]*-->/i
-  );
-  if (lastModifiedMatch) {
-    lastModified = lastModifiedMatch[1].trim();
+  // Pages use several different comment formats, e.g.:
+  //   <!-- Page last modified date: 2024-03-15 -->
+  //   <!-- Page last modified date 07.04.2026 09:39:55 -->
+  //   <!-- Last modified on Wed, 06 May 2026 15:45:08 BST by RicciB -->
+  //   <!-- Last modified on Mon, 16 May 2011 10:09:50 BST by  -->
+  // Try each pattern in order; capture everything after the keyword/prefix
+  // up to an optional 'by <author>' trailer and the closing '-->'
+  // so the raw date+time string is preserved exactly as authored.
+  let lastModified     = null;
+  let lastModifiedBy   = null;
+
+  const patterns = [
+    // "Page last modified date[:]  <value>"
+    /<!--\s*Page last modified date[:\s]+(.+?)(?:\s*-->)/i,
+    // "Last modified on <value> [by <author>]"
+    /<!--\s*Last modified on\s+(.+?)(?:\s+by\s+(.*?))?\s*-->/i,
+  ];
+
+  for (const pattern of patterns) {
+    const m = html.match(pattern);
+    if (m) {
+      lastModified   = m[1].trim() || null;
+      lastModifiedBy = (m[2] !== undefined ? m[2].trim() : null) || null;
+      break;
+    }
   }
 
-  return { title, headings, body, links, lastModified };
+  return { title, headings, body, links, lastModified, lastModifiedBy };
 }
 
 // ── Link Discovery ─────────────────────────────────────────
@@ -176,10 +193,10 @@ async function crawl() {
       await new Promise(r => setTimeout(r, DELAY_MS));
 
       const html = await page.content();
-      const { title, headings, body, links: linkText, lastModified } = extractContent(html, url);
+      const { title, headings, body, links: linkText, lastModified, lastModifiedBy } = extractContent(html, url);
 
       if (title && body) {
-        index.push({ url, title, headings, body, links: linkText, lastModified });
+        index.push({ url, title, headings, body, links: linkText, lastModified, lastModifiedBy });
       }
 
       const discovered = discoverLinks(html, url);
