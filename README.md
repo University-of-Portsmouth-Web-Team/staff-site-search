@@ -157,18 +157,24 @@ only if it has changed.
 ### Chrome / Puppeteer install (important)
 
 The full `puppeteer` package normally downloads Chrome during `npm install` via a
-postinstall script. The workflow sets `PUPPETEER_SKIP_DOWNLOAD=true` for the
-install step and installs Chrome explicitly in a separate step instead. This
-avoids two install paths racing to populate the same cache directory, which
-otherwise produces:
+postinstall script. The workflow runs `npm install --ignore-scripts` to suppress
+that, then installs Chrome explicitly in a separate step. This avoids two install
+paths racing to populate the same cache directory, which otherwise produces:
 
 ```
 Error: All providers failed for chrome <version>:
   - DefaultProvider: The browser folder (...) exists but the executable (...) is missing
 ```
 
-The explicit install step also clears `~/.cache/puppeteer/chrome` first, so a
-stale or partial download can never cause the installer to abort.
+The explicit install step also clears `~/.cache/puppeteer` first, so a stale or
+partial download can never cause the installer to abort.
+
+> **Do not** use `PUPPETEER_SKIP_DOWNLOAD=true` to suppress the postinstall. That
+> environment variable is also read by the `puppeteer browsers install` CLI, so it
+> makes the explicit install step skip its download too — leaving no browser
+> installed and the crawler failing with `Could not find Chrome`. Use
+> `--ignore-scripts` on `npm install` instead, which only affects the install
+> step, not the browser download.
 
 ## How the index is consumed
 
