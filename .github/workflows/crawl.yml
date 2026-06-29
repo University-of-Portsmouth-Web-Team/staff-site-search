@@ -22,31 +22,56 @@ jobs:
         with:
           node-version: '24'
           # cache: 'npm' intentionally omitted — requires a lockfile at repo root.
-          # npm install in the next step handles dependency resolution directly.
 
       # Step 3: Install crawler dependencies
-      # --ignore-scripts stops Puppeteer's postinstall from auto-downloading Chrome
-      # here. We install the browser explicitly in Step 4 instead, so the two paths
-      # don't race to populate the same cache directory.
-      #
-      # NOTE: do NOT use PUPPETEER_SKIP_DOWNLOAD to suppress the postinstall — that
-      # env var ALSO makes the explicit `puppeteer browsers install` step skip its
-      # download, leaving no browser installed and the crawler unable to find Chrome.
+      # --ignore-scripts stops Puppeteer's postinstall from auto-downloading Chrome.
+      # We do the browser install explicitly and deterministically in Step 4.
       - name: Install dependencies
         working-directory: ./crawler
         run: npm install --ignore-scripts
 
-      # Step 4: Install Chrome for Puppeteer (single, clean install)
-      # Clear any stale/partial download first so the installer never finds an
-      # incomplete folder and aborts. No PUPPETEER_SKIP_DOWNLOAD here.
+      # Step 4: Install Chrome for Puppeteer (deterministic, verified)
+      #
+      # We DELIBERATELY use the raw `@puppeteer/browsers` installer rather than
+      # `npx puppeteer browsers install chrome`. The puppeteer wrapper consults
+      # Puppeteer's `skipDownload` configuration and, in this CI environment, was
+      # silently skipping the download (exiting 0 without installing a browser),
+      # which then made `crawl.js` fail with "Could not find Chrome". The raw
+      # installer ignores that configuration and always downloads.
+      #
+      # The build ID is read straight from the installed Puppeteer so it always
+      # matches the version `puppeteer.launch()` expects. We then verify the
+      # binary exists and pin PUPPETEER_EXECUTABLE_PATH so the crawler launches
+      # exactly this Chrome. If anything goes wrong the step fails loudly here
+      # rather than silently passing.
       - name: Install Puppeteer browser
         working-directory: ./crawler
         run: |
+          set -euo pipefail
           rm -rf "${HOME}/.cache/puppeteer"
-          npx puppeteer browsers install chrome
+
+          BUILD_ID="$(node -e "let r;try{r=require('puppeteer-core/internal/revisions.js').PUPPETEER_REVISIONS}catch(e){r=require('puppeteer').PUPPETEER_REVISIONS}console.log(r.chrome)")"
+          echo "Pinned Chrome build: ${BUILD_ID}"
+
+          INSTALL_OUTPUT="$(npx --yes @puppeteer/browsers install "chrome@${BUILD_ID}" --path "${HOME}/.cache/puppeteer")"
+          echo "${INSTALL_OUTPUT}"
+
+          # Default install output format is: chrome@<buildId> <absolute-path>
+          CHROME_PATH="$(printf '%s\n' "${INSTALL_OUTPUT}" | tail -n1 | awk '{print $NF}')"
+          echo "Chrome executable: ${CHROME_PATH}"
+
+          # Hard gate: never continue if the browser isn't actually present.
+          if [ -z "${CHROME_PATH}" ] || [ ! -x "${CHROME_PATH}" ]; then
+            echo "::error::Chrome was not installed (no executable at '${CHROME_PATH}')."
+            exit 1
+          fi
+
+          # Make the crawler launch exactly this binary (puppeteer reads this env).
+          echo "PUPPETEER_EXECUTABLE_PATH=${CHROME_PATH}" >> "${GITHUB_ENV}"
 
       # Step 5: Run the crawler
-      # Secrets are passed as environment variables — never hardcoded
+      # Secrets are passed as environment variables — never hardcoded.
+      # PUPPETEER_EXECUTABLE_PATH is inherited from Step 4 via GITHUB_ENV.
       - name: Run crawler
         working-directory: ./crawler
         env:
