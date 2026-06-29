@@ -25,14 +25,24 @@ jobs:
           # npm install in the next step handles dependency resolution directly.
 
       # Step 3: Install crawler dependencies
+      # PUPPETEER_SKIP_DOWNLOAD prevents Puppeteer's postinstall from downloading
+      # Chrome here. We do the browser install explicitly in Step 4 so the two
+      # don't race to populate the same cache directory (the cause of the
+      # "browser folder exists but the executable is missing" failure).
       - name: Install dependencies
         working-directory: ./crawler
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
         run: npm install
 
-      # Step 4: Install Chromium for Puppeteer
+      # Step 4: Install Chromium for Puppeteer (single, clean install)
+      # Clear any stale/partial download first so the installer never finds an
+      # incomplete folder and aborts.
       - name: Install Puppeteer browser
         working-directory: ./crawler
-        run: npx puppeteer browsers install chrome
+        run: |
+          rm -rf "${HOME}/.cache/puppeteer/chrome"
+          npx puppeteer browsers install chrome
 
       # Step 5: Run the crawler
       # Secrets are passed as environment variables — never hardcoded
@@ -51,6 +61,5 @@ jobs:
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add docs/search-index.json
           # Only commit if the file actually changed
-          git diff --staged --quiet || git commit -m \
-            'chore: update search index [$(date -u +%Y-%m-%dT%H:%M:%SZ)]'
+          git diff --staged --quiet || git commit -m "chore: update search index [$(date -u +%Y-%m-%dT%H:%M:%SZ)]"
           git push
