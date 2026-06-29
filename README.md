@@ -157,24 +157,25 @@ only if it has changed.
 ### Chrome / Puppeteer install (important)
 
 The full `puppeteer` package normally downloads Chrome during `npm install` via a
-postinstall script. The workflow runs `npm install --ignore-scripts` to suppress
-that, then installs Chrome explicitly in a separate step. This avoids two install
-paths racing to populate the same cache directory, which otherwise produces:
+postinstall script. The workflow disables that with `npm install --ignore-scripts`
+and installs Chrome explicitly in a dedicated step, so there is exactly one,
+deterministic install path.
 
-```
-Error: All providers failed for chrome <version>:
-  - DefaultProvider: The browser folder (...) exists but the executable (...) is missing
-```
+That step deliberately uses the **raw `@puppeteer/browsers` installer**, not
+`npx puppeteer browsers install chrome`. The `puppeteer` wrapper consults
+Puppeteer's `skipDownload` configuration, and in the GitHub Actions environment it
+was silently skipping the download — exiting successfully without installing a
+browser — which then caused the crawler to fail with `Could not find Chrome`. The
+raw installer ignores that configuration and always downloads. The build ID is read
+directly from the installed Puppeteer so it always matches the version
+`puppeteer.launch()` expects, the step verifies the binary actually exists (failing
+loudly if not), and it pins `PUPPETEER_EXECUTABLE_PATH` so the crawler launches that
+exact Chrome.
 
-The explicit install step also clears `~/.cache/puppeteer` first, so a stale or
-partial download can never cause the installer to abort.
-
-> **Do not** use `PUPPETEER_SKIP_DOWNLOAD=true` to suppress the postinstall. That
-> environment variable is also read by the `puppeteer browsers install` CLI, so it
-> makes the explicit install step skip its download too — leaving no browser
-> installed and the crawler failing with `Could not find Chrome`. Use
-> `--ignore-scripts` on `npm install` instead, which only affects the install
-> step, not the browser download.
+> **Do not** "simplify" this back to `npx puppeteer browsers install chrome`, and do
+> not use `PUPPETEER_SKIP_DOWNLOAD` to suppress the postinstall — both routes go
+> through the wrapper's skip logic and reintroduce the silent no-op. Use
+> `--ignore-scripts` plus the raw `@puppeteer/browsers` installer.
 
 ## How the index is consumed
 
